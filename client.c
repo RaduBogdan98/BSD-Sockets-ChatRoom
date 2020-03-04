@@ -95,7 +95,7 @@ int main() {
 		exit(1);
 	}
 
-	//print server response
+	//Print server response
 	printf("%s\n", server_response);
 
 	//Data exchange
