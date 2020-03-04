@@ -83,7 +83,7 @@ int main() {
 	}
 
 	for (;;) {
-		//accept clients
+		//Accept clients
 		int client_socket;
 		client_socket = accept(server_socket, NULL, NULL);
 		if (client_socket < 0) {
