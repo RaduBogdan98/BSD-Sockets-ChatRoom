@@ -6,12 +6,24 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <arpa/inet.h>
+#define IP "192.168.0.106"
 
 void process(int client_socket) {
-	int data_size = 0;
+	int data_size = 0, username_length = 0;
 	char data[256] = "";
+	char username[256] = "";
 
 	if (recv(client_socket, &data, sizeof(int), 0) < 0) {
+		perror("Receive error");
+		exit(1);
+	}
+
+	if (recv(client_socket, &username_length, sizeof(int), 0) < 0) {
+		perror("Receive error");
+		exit(1);
+	}
+
+	if (recv(client_socket, &username, username_length, 0) < 0) {
 		perror("Receive error");
 		exit(1);
 	}
@@ -30,11 +42,11 @@ void process(int client_socket) {
 		return;
 	}
 	else {
-		printf("Message received is: %s\n", data);
+		printf("%s: %s\n", username, data);
 	}
 
 	//send the message
-	char server_message[256] = "Request precessed";
+	char server_message[256] = "Request processed";
 	send(client_socket, server_message, sizeof(server_message), 0);
 
 	return;
@@ -56,7 +68,7 @@ int main() {
 	struct sockaddr_in server_address;
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(9002);
-	server_address.sin_addr.s_addr = inet_addr("172.20.10.13");
+	server_address.sin_addr.s_addr = inet_addr(IP);
 
 	//bind the socket to our specified IP and port
 	if (bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address)) < 0) {
