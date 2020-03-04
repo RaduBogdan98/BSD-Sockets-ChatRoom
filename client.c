@@ -9,7 +9,7 @@
 #include <arpa/inet.h>
 #define IP "192.168.0.106"
 
-char username[256];
+char username[256] = "";
 
 int send_to_server(int network_socket) {
 
