@@ -7,57 +7,68 @@
 #include <string.h>
 #include <inttypes.h>
 #include <arpa/inet.h>
-#define IP "192.168.0.106"
+#define IP "192.168.1.160"
 
 char username[256] = "";
 
-int send_to_server(int network_socket) {
+int getUserAndPassword() {
+	printf("Please Login\n\n");
+	printf("Username: ");
+	fgets(username, 256, stdin);
+	username[strlen(username) - 1] = 0;
 
+	//Send the username to server 
+
+	//Same thing for the password
+
+	//The server will check if the credentials are correct and send back a response
+	//Based on the response this function returns 1 or 0
+
+	return 1;
+}
+
+int send_to_server(int network_socket) {
+	//read user message
 	char message[256] = "";
-	// printf("%s: ", id);
 	fgets(message, 256, stdin);
 	message[strlen(message) - 1] = 0;
 
+	//treat end message
 	if (strcmp(message, "End") == 0) {
 		return 0;
 	}
 
-	char message_length[256];
-	sprintf(message_length, "%ld", strlen(message));
-	int username_length = strlen(username);
+	//Add user caption to the message
+	char captioned_message[256] = "";
+	sprintf(captioned_message, "%s: %s", username, message);
 
+	//send the message length
+	char message_length[256];
+	sprintf(message_length, "%ld", strlen(captioned_message));
 	if (send(network_socket, &message_length, strlen(message_length), 0) < 0) {
 		perror("Send error");
 		exit(1);
 	}
 
-	if (send(network_socket, &username_length, sizeof(int), 0) < 0) {
-		perror("Send error");
-		exit(1);
-	}
-
-	if (send(network_socket, &username, username_length, 0) < 0) {
-		perror("Send error");
-		exit(1);
-	}
-
-	if (recv(network_socket, &message_length, 256, 0) < 0) {
+	//receive the send confirmation from server
+	if (recv(network_socket, &message, 256, 0) < 0) {
 		perror("Receive error");
 		exit(1);
 	}
 
-	if (send(network_socket, message, strlen(message), 0) < 0) {
+	//send the message
+	if (send(network_socket, captioned_message, strlen(captioned_message), 0) < 0) {
 		perror("Send error");
 		exit(1);
 	}
 
+	//receive data transfer completed message
 	if (recv(network_socket, &message, 256, 0) < 0) {
 		perror("Receive error");
 		exit(1);
 	}
 
 	printf("%s\n", message);
-
 	return 1;
 }
 
@@ -84,9 +95,7 @@ int main() {
 		exit(1);
 	}
 
-	printf("Choose username: ");
-	fgets(username, 256, stdin);
-	username[strlen(username) - 1] = 0;
+	getUserAndPassword();
 
 	//receive data from server
 	char server_response[256];

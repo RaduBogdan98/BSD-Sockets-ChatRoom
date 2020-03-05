@@ -6,48 +6,46 @@
 #include <netinet/in.h>
 #include <string.h>
 #include <arpa/inet.h>
-#define IP "192.168.0.106"
+#define IP "192.168.1.160"
 
 void process(int client_socket) {
-	int data_size = 0, username_length = 0;
+	int data_size = 0;
 	char data[256] = "";
-	char username[256] = "";
 
+	//recieve message size
 	if (recv(client_socket, &data, sizeof(int), 0) < 0) {
 		perror("Receive error");
 		exit(1);
 	}
-
-	if (recv(client_socket, &username_length, sizeof(int), 0) < 0) {
-		perror("Receive error");
-		exit(1);
-	}
-
-	if (recv(client_socket, &username, username_length, 0) < 0) {
-		perror("Receive error");
-		exit(1);
-	}
-
+	//convert message to integer
 	data_size = atoi(data);
 
-	send(client_socket, &data_size, sizeof(data_size), 0);
-
-	strcpy(data, "");
-	int length = recv(client_socket, &data, data_size, 0);
-	if (length < 0) {
+	//send response
+	if (send(client_socket, "Data received", 256, 0) < 0) {
 		perror("Receive error");
 		exit(1);
 	}
-	else if (length == 0) {
+
+	//receive the and print the message 
+	//or close the connection if it has ended
+	int status = recv(client_socket, &data, data_size, 0);
+	if (status < 0) {
+		perror("Receive error");
+		exit(1);
+	}
+	else if (status == 0) {
 		return;
 	}
 	else {
-		printf("%s: %s\n", username, data);
+		printf("%s \n",data);
 	}
 
-	//send the message
+	//send process end message
 	char server_message[256] = "Request processed";
-	send(client_socket, server_message, sizeof(server_message), 0);
+	if (send(client_socket, server_message, sizeof(server_message), 0) < 0) {
+		perror("Receive error");
+		exit(1);
+	}
 
 	return;
 }
