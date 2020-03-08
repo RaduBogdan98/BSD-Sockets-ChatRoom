@@ -1,3 +1,4 @@
--sa mai aranjam functia de data transfer(send recv)
--sa trateze serverul sfaristul comunicarii cu un client
--sa transmita serverul mesajele la clienti
+DONE - sa mai aranjam functia de data transfer(send recv)
+? - sa trateze serverul sfaristul comunicarii cu un client
+
+- sa transmita serverul mesajele la clienti (comunicare in grup)
