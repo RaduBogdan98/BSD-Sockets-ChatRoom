@@ -5,11 +5,13 @@
 #include <netinet/in.h>
 #include <unistd.h>
 #include <string.h>
+#include <signal.h>
 #include <inttypes.h>
 #include <arpa/inet.h>
 #define IP "192.168.1.160"
 
 char username[256] = "";
+int pid;
 
 int getUserAndPassword() {
 	printf("Please Login\n\n");
@@ -27,7 +29,7 @@ int getUserAndPassword() {
 	return 1;
 }
 
-int send_to_server(int network_socket) {
+int sendToServer(int network_socket) {
 	//read user message
 	char message[256] = "";
 	fgets(message, 256, stdin);
@@ -35,6 +37,7 @@ int send_to_server(int network_socket) {
 
 	//treat end message
 	if (strcmp(message, "End") == 0) {
+		kill(pid, SIGINT);
 		return 0;
 	}
 
@@ -45,14 +48,8 @@ int send_to_server(int network_socket) {
 	//send the message length
 	char message_length[256];
 	sprintf(message_length, "%ld", strlen(captioned_message));
-	if (send(network_socket, &message_length, strlen(message_length), 0) < 0) {
+	if (send(network_socket, &message_length, sizeof(int), 0) < 0) {
 		perror("Send error");
-		exit(1);
-	}
-
-	//receive the send confirmation from server
-	if (recv(network_socket, &message, 256, 0) < 0) {
-		perror("Receive error");
 		exit(1);
 	}
 
@@ -62,14 +59,39 @@ int send_to_server(int network_socket) {
 		exit(1);
 	}
 
-	//receive data transfer completed message
-	if (recv(network_socket, &message, 256, 0) < 0) {
+	return 1;
+}
+
+void receiveFromServer(int network_socket) {
+	int data_size = 0;
+	char data[256] = "";
+
+	//recieve message size
+	if (recv(network_socket, &data, sizeof(int), 0) <= 0) {
 		perror("Receive error");
 		exit(1);
 	}
 
-	printf("%s\n", message);
-	return 1;
+	//convert message to integer
+	data_size = atoi(data);
+	bzero(data, strlen(data));
+
+	//receive the and print the message 
+	//or close the connection if it has ended
+	int status = recv(network_socket, &data, data_size, 0);
+	if (status < 0) {
+		perror("Receive error");
+		exit(1);
+	}
+	else if (status == 0) {
+		return;
+	}
+	else {
+		printf("%s \n", data);
+	}
+	bzero(data, strlen(data));
+
+	return;
 }
 
 int main() {
@@ -107,8 +129,19 @@ int main() {
 	//Print server response
 	printf("%s\n", server_response);
 
+	pid = fork();
+	if (pid < 0) {
+		perror("Fork error");
+		exit(1);
+	}
+	else if (pid == 0) {
+		while (1) {
+			receiveFromServer(network_socket);
+		}
+	}
+
 	//Data exchange
-	while (send_to_server(network_socket));
+	while (sendToServer(network_socket));
 
 	//close the socket
 	close(network_socket);
