@@ -13,34 +13,65 @@
 #include <arpa/inet.h>
 #include <errno.h>
 
-#define IP "192.168.1.160"
+#define IP "192.168.1.5"
 
 int sockets[20];
-int num_clients;
+int clientsCount;
 int pfd[2];
 
-int fd_is_valid(int fd)
-{
-	return fcntl(fd, F_GETFD) != -1 || errno != EBADF;
+//remove a socket form the sockets list
+void removeSocket(int socketFd) {
+	int i;
+	for (i = 0; i < clientsCount; i++) {
+		if (sockets[i] == socketFd) break;
+	}
+
+	close(sockets[i]);
+
+	for (int j = i; j < clientsCount - 1; j++) {
+		sockets[j] = sockets[j + 1];
+	}
+	clientsCount--;
 }
 
 void sendToAll(char* buff) {
-	for (int i = 0; i < num_clients; i++) {
-		if (fd_is_valid(sockets[i])) {
-			char length[256]="5";
-			sprintf(length, "%ld", strlen(buff));
-			if (send(sockets[i], length, sizeof(int), 0) <= 0) {
-				perror("Send error");
-				exit(1);
+	int socketsToRemove[clientsCount];
+	int count = 0;
+
+	for (int i = 0; i < clientsCount; i++) {
+		char length[256] = "";
+		sprintf(length, "%ld", strlen(buff));
+
+		if (send(sockets[i], length, sizeof(int), 0) <= 0) {
+			//if the pipe is broken the client has closed the pipe AKA closed the connection
+			if (errno == EPIPE) {
+				//mark the socket to be removed
+				socketsToRemove[count] = sockets[i];
+				count++;
+				continue;
 			}
-
-			printf("Am trecut\n");
-
-			if (send(sockets[i], buff, strlen(buff), 0) <= 0) {
+			else {
 				perror("Send error");
 				exit(1);
 			}
 		}
+
+		if (send(sockets[i], buff, strlen(buff), 0) <= 0) {
+			if (errno == EPIPE) {
+				socketsToRemove[count] = sockets[i];
+				count++;
+				continue;
+			}
+			else {
+				perror("Send error");
+				exit(1);
+			}
+		}
+	}
+
+	//remove the broken sockets
+	for (int i = 0; i < count; i++) {
+		removeSocket(socketsToRemove[i]);
 	}
 }
 
@@ -68,9 +99,14 @@ void process(int client_socket) {
 	char data[256] = "";
 
 	//recieve message size
-	if (recv(client_socket, &data, sizeof(int), 0) < 0) {
+	int status = recv(client_socket, &data, sizeof(int), 0);
+	if (status < 0) {
 		perror("Receive error");
 		exit(1);
+	}
+	else if (status == 0) {
+		printf("Client with socket %d has left the server!\n", client_socket);
+		exit(0);
 	}
 	write(pfd[1], &data, sizeof(int));
 
@@ -80,7 +116,7 @@ void process(int client_socket) {
 
 	//receive the and print the message 
 	//or close the connection if it has ended
-	int status = recv(client_socket, &data, data_size, 0);
+	status = recv(client_socket, &data, data_size, 0);
 	if (status < 0) {
 		perror("Receive error");
 		exit(1);
@@ -113,6 +149,16 @@ int main() {
 		return 0;
 	}
 
+	struct sigaction interruptAction;
+	interruptAction.sa_handler = SIG_IGN;
+	interruptAction.sa_flags = 0 | SA_RESTART;
+
+	if (sigaction(SIGPIPE, &interruptAction, NULL) < 0)
+	{
+		printf("Sigaction error\n");
+		return 0;
+	}
+
 	if (pipe(pfd) < 0)
 	{
 		perror("Pipe");
@@ -134,7 +180,7 @@ int main() {
 	struct sockaddr_in server_address;
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(9002);
-	server_address.sin_addr.s_addr = inet_addr(IP);
+	server_address.sin_addr.s_addr = INADDR_ANY;
 
 	//bind the socket to our specified IP and port
 	if (bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address)) < 0) {
@@ -158,10 +204,10 @@ int main() {
 			perror("Accept error");
 			exit(1);
 		}
-		printf("New Client has connected to the server\n");
+		printf("New Client has connected to the server on socket %d!\n", client_socket);
 
-		sockets[num_clients] = client_socket;
-		num_clients++;
+		sockets[clientsCount] = client_socket;
+		clientsCount++;
 
 		if (fork() == 0) {
 			close(pfd[0]);
@@ -169,7 +215,7 @@ int main() {
 			send(client_socket, server_message, sizeof(server_message), 0);
 
 			sendAction.sa_handler = SIG_IGN;
-			sendAction.sa_flags = 0;
+			sendAction.sa_flags = 0 | SA_RESTART;
 
 			if (sigaction(SIGUSR1, &sendAction, NULL) < 0)
 			{
@@ -186,7 +232,7 @@ int main() {
 		}
 	}
 
-	for (int i = 0; i < num_clients; i++) {
+	for (int i = 0; i < clientsCount; i++) {
 		close(sockets[i]);
 	}
 	close(server_socket);
