@@ -12,22 +12,66 @@
 #define IP "192.168.1.5"
 
 char username[256] = "";
+char password[256] = "";
 int pid;
 
-int getUserAndPassword() {
-	printf("Please Login\n\n");
-	printf("Username: ");
-	fgets(username, 256, stdin);
-	username[strlen(username) - 1] = 0;
+int getUserAndPassword(int network_socket) {
+	int n = 0;
+	int found = 0;
+	char credentials[512] = "";
 
-	//Send the username to server 
+	while (n < 5 && found == 0) {
+		system("clear");
+		//read user input 
+		printf("Enter your username:\n");
+		scanf("%s", username);
+		printf("Enter your password:\n");
+		scanf("%s", password);
 
-	//Same thing for the password
+		sprintf(credentials, "%s:%s", username, password);
 
-	//The server will check if the credentials are correct and send back a response
-	//Based on the response this function returns 1 or 0
+		//send the credentials length
+		char credentials_length[256];
+		sprintf(credentials_length, "%ld", strlen(credentials));
+		if (send(network_socket, &credentials_length, sizeof(int), 0) < 0) {
+			perror("Send error");
+			exit(1);
+		}
 
-	return 1;
+		//send credentials
+		if (send(network_socket, credentials, strlen(credentials), 0) < 0) {
+			perror("Send error");
+			exit(1);
+		}
+
+		//receive 'Accepted' or 'Rejected'
+		char data[256] = "";
+		if (recv(network_socket, &data, 9, 0) <= 0) {
+			perror("Receive error");
+			exit(1);
+		}
+
+		if (strcmp(data, "Accepted") == 0) {
+			found = 1;
+		}
+
+		if (!found && n<4) {
+			printf("No user with such credentials exists! Retry!\n");
+			getchar();
+			getchar();
+		}
+
+		n++;
+	}
+
+	if (1 == found) {
+		printf("Login Succesful!\n");
+	}
+	else {
+		printf("You are out of try's!\n");
+	}
+
+	return found;
 }
 
 int sendToServer(int network_socket) {
@@ -118,7 +162,9 @@ int main() {
 		exit(1);
 	}
 
-	getUserAndPassword();
+	if (0 == getUserAndPassword(network_socket)) {
+		return 1;
+	}
 
 	//receive data from server
 	char server_response[256];

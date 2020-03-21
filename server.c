@@ -19,6 +19,71 @@ int sockets[20];
 int clientsCount;
 int pfd[2];
 
+int checkCredentials(int client_socket) {
+	int n = 0;
+	int found = 0;
+
+	while (n < 5 && found == 0) {
+		char credentials[256] = "";
+		int dataSize = 0;
+
+		//receive credentials length
+		int status = recv(client_socket, &credentials, sizeof(int), 0);
+		if (status < 0) {
+			perror("Receive error");
+			exit(1);
+		}
+		else if (status == 0) {
+			return 0;
+		}
+
+		dataSize = atoi(credentials);
+
+		//receive credentials
+		status = recv(client_socket, &credentials, dataSize, 0);
+		if (status < 0) {
+			perror("Receive error");
+			exit(1);
+		}
+		else if (status == 0) {
+			return 0;
+		}
+
+		//try to find credentials
+		FILE* filePointer = fopen("fisier.txt", "r");
+		char buffer[255];
+		while (fgets(buffer, 255, filePointer)) {
+			int len = strlen(buffer);
+			if (len > 0 && buffer[len - 1] == '\n')
+				buffer[len - 1] = 0;
+
+			if (strcmp(credentials, buffer) == 0) {
+				found = 1;
+			}
+		}
+
+		//send response
+		if (1 == found) {
+			if (send(client_socket, "Accepted", strlen("Accepted"), 0) < 0) {
+				perror("Send error");
+				exit(1);
+			}
+			return 1;
+		}
+		else {
+			if (send(client_socket, "Rejected", strlen("Rejected"), 0) < 0) {
+				perror("Send error");
+				exit(1);
+			}
+		}
+
+		fclose(filePointer);
+		n++;
+	}
+
+	return 0;
+}
+
 //remove a socket form the sockets list
 void removeSocket(int socketFd) {
 	int i;
@@ -181,6 +246,7 @@ int main() {
 	server_address.sin_family = AF_INET;
 	server_address.sin_port = htons(9002);
 	server_address.sin_addr.s_addr = INADDR_ANY;
+	//inet_addr(IP)
 
 	//bind the socket to our specified IP and port
 	if (bind(server_socket, (struct sockaddr*) &server_address, sizeof(server_address)) < 0) {
@@ -204,8 +270,11 @@ int main() {
 			perror("Accept error");
 			exit(1);
 		}
-		printf("New Client has connected to the server on socket %d!\n", client_socket);
+		if (0 == checkCredentials(client_socket)) {
+			continue;
+		}
 
+		printf("New Client has connected to the server on socket %d!\n", client_socket);
 		sockets[clientsCount] = client_socket;
 		clientsCount++;
 
