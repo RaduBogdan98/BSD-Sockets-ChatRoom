@@ -8,12 +8,39 @@
 #include <signal.h>
 #include <inttypes.h>
 #include <arpa/inet.h>
+#include <termios.h>
 
 #define IP "192.168.1.5"
 
 char username[256] = "";
 char password[256] = "";
 int pid;
+
+char* readPassword(){
+	struct termios oflags, nflags;
+	char* password = (char*)malloc(255 * sizeof(char));
+
+	/* disabling echo */
+	tcgetattr(fileno(stdin), &oflags);
+	nflags = oflags;
+	nflags.c_lflag &= ~ECHO;
+	nflags.c_lflag |= ECHONL;
+
+	if (tcsetattr(fileno(stdin), TCSANOW, &nflags) != 0) {
+		perror("tcsetattr");
+		exit(1);
+	}
+
+	scanf("%s", password);
+
+	/* restore terminal */
+	if (tcsetattr(fileno(stdin), TCSANOW, &oflags) != 0) {
+		perror("tcsetattr");
+		exit(1);
+	}
+
+	return password;
+}
 
 int getUserAndPassword(int network_socket) {
 	int n = 0;
@@ -26,7 +53,7 @@ int getUserAndPassword(int network_socket) {
 		printf("Enter your username:\n");
 		scanf("%s", username);
 		printf("Enter your password:\n");
-		scanf("%s", password);
+		strcpy(password,readPassword());
 
 		sprintf(credentials, "%s:%s", username, password);
 
@@ -79,6 +106,11 @@ int sendToServer(int network_socket) {
 	char message[256] = "";
 	fgets(message, 256, stdin);
 	message[strlen(message) - 1] = 0;
+
+	//exit for blank messages
+	if (strlen(message) == 0) {
+		return 1;
+	}
 
 	//treat end message
 	if (strcmp(message, "End") == 0) {

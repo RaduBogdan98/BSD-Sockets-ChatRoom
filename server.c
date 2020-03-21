@@ -50,12 +50,13 @@ int checkCredentials(int client_socket) {
 		}
 
 		//try to find credentials
-		FILE* filePointer = fopen("fisier.txt", "r");
+		FILE* filePointer = fopen("userData.txt", "r");
 		char buffer[255];
 		while (fgets(buffer, 255, filePointer)) {
 			int len = strlen(buffer);
-			if (len > 0 && buffer[len - 1] == '\n')
+			if (len > 0 && buffer[len - 1] == '\n') {
 				buffer[len - 1] = 0;
+			}
 
 			if (strcmp(credentials, buffer) == 0) {
 				found = 1;
@@ -191,7 +192,7 @@ void process(int client_socket) {
 		exit(0);
 	}
 	else {
-		printf("%s \n", data);
+		printf("Message send by socket %d!\n", client_socket);
 	}
 
 	//send the message to all clients
