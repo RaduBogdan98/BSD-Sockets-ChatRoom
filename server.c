@@ -12,12 +12,14 @@
 #include <sys/mman.h>
 #include <arpa/inet.h>
 #include <errno.h>
+#include <time.h>
 
 #define IP "192.168.1.5"
 
 int sockets[20];
 int clientsCount;
 int pfd[2];
+char username[256];
 
 int checkCredentials(int client_socket) {
 	int n = 0;
@@ -69,6 +71,9 @@ int checkCredentials(int client_socket) {
 				perror("Send error");
 				exit(1);
 			}
+			char* p = strtok(credentials, ":");
+			strcpy(username,p);
+
 			return 1;
 		}
 		else {
@@ -171,7 +176,7 @@ void process(int client_socket) {
 		exit(1);
 	}
 	else if (status == 0) {
-		printf("Client with socket %d has left the server!\n", client_socket);
+		printf("%s has left the server, from socket %d!\n", username, client_socket);
 		exit(0);
 	}
 	write(pfd[1], &data, sizeof(int));
@@ -188,11 +193,16 @@ void process(int client_socket) {
 		exit(1);
 	}
 	else if (status == 0) {
-		printf("Client with socket %d has left the server!\n", client_socket);
+		printf("%s has left the server, from socket %d!\n", username, client_socket);
 		exit(0);
 	}
 	else {
-		printf("Message send by socket %d!\n", client_socket);
+		time_t my_time;
+		struct tm * timeinfo;
+		time(&my_time);
+		timeinfo = localtime(&my_time);
+
+		printf("%d:%d:%d - Message send by %s!\n", timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec, username);
 	}
 
 	//send the message to all clients
@@ -275,7 +285,7 @@ int main() {
 			continue;
 		}
 
-		printf("New Client has connected to the server on socket %d!\n", client_socket);
+		printf("%s has connected to the server on socket %d!\n", username, client_socket);
 		sockets[clientsCount] = client_socket;
 		clientsCount++;
 
